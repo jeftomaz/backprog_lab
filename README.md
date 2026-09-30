@@ -15,6 +15,7 @@ Laboratório visual para estudar redes neurais com uma camada oculta, forward pr
 - presets XOR e Iris;
 - fluxo em duas etapas: Preparação e Prática;
 - edição centralizada de entradas, alvos e pesos, com validação numérica;
+- definição manual de pesos, com bloqueio de inicialização zerada ou simétrica;
 - diagrama SVG consultivo: clicar em um nó destaca somente suas conexões;
 - prática guiada: os dados conhecidos vêm da Preparação e o aluno preenche cada resultado calculado;
 - caderno único com os resultados validados, reutilizados automaticamente nas próximas fórmulas;

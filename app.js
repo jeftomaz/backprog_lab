@@ -18,7 +18,7 @@
     sidebar: $('sidebar'), sidebarScrim: $('sidebarScrim'), openSidebarBtn: $('openSidebarBtn'), closeSidebarBtn: $('closeSidebarBtn'),
     inputCount: $('inputCount'), hiddenCount: $('hiddenCount'), outputCount: $('outputCount'), learningRate: $('learningRate'), momentum: $('momentum'), tolerance: $('tolerance'),
     useBias: $('useBias'), weightLabelMode: $('weightLabelMode'),
-    randomizeBtn: $('randomizeBtn'), resetAllBtn: $('resetAllBtn'), presetXorBtn: $('presetXorBtn'), presetIrisBtn: $('presetIrisBtn'),
+    manualWeightsBtn: $('manualWeightsBtn'), randomizeBtn: $('randomizeBtn'), resetAllBtn: $('resetAllBtn'), presetXorBtn: $('presetXorBtn'), presetIrisBtn: $('presetIrisBtn'),
     valuesEditor: $('valuesEditor'), setupNotice: $('setupNotice'), setupFeedback: $('setupFeedback'), startBtn: $('startBtn'), editSetupBtn: $('editSetupBtn'), resetProgressBtn: $('resetProgressBtn'), exportBtn: $('exportBtn'),
     progressBadge: $('progressBadge'), progressBar: $('progressBar'), phaseLabel: $('phaseLabel'),
     themeBtn: $('themeBtn'), themeIcon: $('themeIcon'), themeText: $('themeText'),
@@ -31,15 +31,21 @@
   };
 
   const HELP = {
+    guide: ['Guia rápido da rede', 'x (entradas) são os valores observados que entram na rede.\n\nh (neurônios ocultos) combinam as entradas e aprendem representações intermediárias.\n\ny (saídas) são as previsões calculadas pela rede.\n\nt (alvos) são as respostas corretas esperadas durante o treinamento.\n\nAlvo t não é a mesma coisa que saída y: para cada saída yₖ existe um alvo tₖ correspondente. Eles têm a mesma quantidade, mas yₖ é a previsão e tₖ é o valor desejado usado para calcular o erro tₖ − O(yₖ).\n\nw1 conecta entradas aos ocultos; w2 conecta ocultos às saídas. Bias é uma entrada fixa igual a 1, com seus próprios pesos.'],
+    architecture: ['Arquitetura da rede', 'Aqui você define quantas entradas x, neurônios ocultos h e saídas y a rede terá. Ao mudar uma quantidade, as tabelas de valores e pesos são redimensionadas e a prática atual é reiniciada.'],
+    inputCount: ['Quantidade de entradas', 'Define quantos valores x a rede recebe em cada exemplo. Por exemplo, uma rede que avalia altura e peso tem 2 entradas.'],
+    hiddenCount: ['Neurônios ocultos', 'Define quantos neurônios h compõem a camada intermediária. Eles combinam as entradas antes que a rede produza a previsão.'],
+    outputCount: ['Quantidade de saídas', 'Define quantas previsões y a rede produz. Cada saída yₖ tem um alvo tₖ correspondente; por isso a quantidade de alvos acompanha a quantidade de saídas.'],
     learningRate: ['Taxa de aprendizado (η)', 'Controla o tamanho da correção aplicada aos pesos. Valores maiores aprendem mais rápido, mas podem tornar as atualizações instáveis.'],
     momentum: ['Momentum (α)', 'Acrescenta parte da correção anterior à correção atual. Ele ajuda a manter a direção do aprendizado em sequências de exemplos.'],
     tolerance: ['Tolerância', 'Margem aceita ao conferir uma resposta numérica. A comparação usa a maior margem entre a tolerância e essa fração do resultado esperado.'],
     bias: ['Bias', 'O bias é uma entrada constante b = 1. Seus pesos aparecem como uma linha nas matrizes w1 e w2.'],
     values: ['Entradas, alvos e pesos', 'Este é o único local de edição dos dados conhecidos. O diagrama e a prática usam estes mesmos valores automaticamente.'],
-    inputValues: ['Entradas x', 'São os valores apresentados à rede.'],
-    targets: ['Alvos t', 'É a resposta correta desejada para cada saída. O erro simples é calculado como t − O_y.'],
-    w1: ['Pesos w1', 'Pesos das conexões entre entradas e camada oculta. Cada peso multiplica o valor que sai da sua origem.'],
-    w2: ['Pesos w2', 'Pesos das conexões entre camada oculta e saídas. Eles são usados no forward e no retorno do erro.'],
+    inputValues: ['Entradas x', 'São os valores apresentados à rede em um exemplo. A quantidade de entradas é definida em Arquitetura da rede.'],
+    targets: ['Alvos t', 'Não são as saídas: cada tₖ é a resposta correta desejada para a saída yₖ. A rede calcula O(yₖ), compara com tₖ e obtém o erro tₖ − O(yₖ). Por isso existe um alvo para cada saída.'],
+    manualWeights: ['Definir pesos manualmente', 'Limpa as matrizes w1 e w2 para que você escolha todos os valores iniciais. Preencha cada campo com valores pequenos e diferentes entre neurônios ocultos. A prática não começa com campos vazios, todos os pesos zerados ou dois neurônios ocultos completamente idênticos.'],
+    w1: ['Pesos w1', 'Pesos das conexões entre entradas e camada oculta. Cada peso multiplica o valor que sai da sua origem. Ao defini-los manualmente, use valores pequenos e distintos entre neurônios ocultos.'],
+    w2: ['Pesos w2', 'Pesos das conexões entre camada oculta e saídas. Eles são usados no forward e no retorno do erro. Ao defini-los manualmente, não deixe todos zerados.'],
     diagram: ['Diagrama interativo', 'Clique em um neurônio para destacar as conexões relacionadas e abrir seu inspetor. A edição dos dados fica concentrada na etapa Preparação.'],
     formula: ['Fórmula simbólica', 'Mostra a equação da etapa em notação de texto, com símbolos gregos como η, α e δ.'],
     substitution: ['Substituição automática', 'Substitui na fórmula os mesmos valores definidos na Preparação e os resultados que você já validou. Não é necessário copiá-los para outro formulário.'],
@@ -60,7 +66,8 @@
     z1: [], o1: [], z2: [], o2: [], e2: [], d2: [], r1: [], d1: [], nw1: [], nw2: [],
     steps: [], stepIndex: -1, started: false,
     work: {}, resultAnswers: {}, resultCorrect: {}, revealed: {},
-    focus: null, focusFromStep: true
+    focus: null, focusFromStep: true,
+    weightMode: 'preset'
   };
 
   function setPanel(panelId) {
@@ -122,7 +129,7 @@
     state.focusFromStep = true;
   }
 
-  function buildFreshValues({ randomize = false } = {}) {
+  function buildFreshValues({ randomize = false, announce = false } = {}) {
     if (!validateConfiguration()) return false;
     const hadStarted = state.started;
     readConfig();
@@ -131,8 +138,9 @@
     state.t = Array.from({ length: outputs }, (_, k) => state.t[k] ?? (k === 0 ? 1 : 0));
     const rows1 = inputs + (bias ? 1 : 0);
     const rows2 = hidden + (bias ? 1 : 0);
-    state.w1 = Array.from({ length: rows1 }, (_, i) => Array.from({ length: hidden }, (_, j) => randomize ? rand() : (state.w1[i]?.[j] ?? rand())));
-    state.w2 = Array.from({ length: rows2 }, (_, j) => Array.from({ length: outputs }, (_, k) => randomize ? rand() : (state.w2[j]?.[k] ?? rand())));
+    const resizedWeight = (value) => randomize ? rand() : (Number.isFinite(value) || value === null ? value : (state.weightMode === 'manual' ? null : rand()));
+    state.w1 = Array.from({ length: rows1 }, (_, i) => Array.from({ length: hidden }, (_, j) => resizedWeight(state.w1[i]?.[j])));
+    state.w2 = Array.from({ length: rows2 }, (_, j) => Array.from({ length: outputs }, (_, k) => resizedWeight(state.w2[j]?.[k])));
     state.prevW1 = Array.from({ length: rows1 }, () => Array(hidden).fill(0));
     state.prevW2 = Array.from({ length: rows2 }, () => Array(outputs).fill(0));
     resetComputed();
@@ -140,6 +148,8 @@
     if (hadStarted) {
       el.setupNotice.hidden = true;
       showSetupFeedback('Configuração atualizada. Comece uma nova prática quando estiver pronto.', 'info');
+    } else if (announce) {
+      showSetupFeedback(`Arquitetura atualizada: ${inputs} entrada(s), ${hidden} neurônio(s) oculto(s) e ${outputs} saída(s).`, 'info');
     }
     return true;
   }
@@ -155,6 +165,7 @@
 
   function renderValuesEditor() {
     const { inputs, hidden, outputs, bias } = state.cfg;
+    const valueAttr = (value) => Number.isFinite(value) ? esc(value) : '';
     let html = '';
 
     html += `<div class="value-section"><h3>Entradas x ${helpButton('inputValues')}</h3><div class="table-scroll"><table class="matrix"><tr>`;
@@ -175,7 +186,7 @@
     for (let i = 0; i < inputs + (bias ? 1 : 0); i++) {
       const source = i < inputs ? `x${i + 1}` : 'bias';
       html += `<tr><th>${source}</th>`;
-      for (let j = 0; j < hidden; j++) html += `<td><input data-kind="w1" data-i="${i}" data-j="${j}" type="number" min="-1000000" max="1000000" step="any" value="${esc(state.w1[i][j])}" aria-label="Peso ${source} para h${j + 1}"></td>`;
+      for (let j = 0; j < hidden; j++) html += `<td><input data-kind="w1" data-i="${i}" data-j="${j}" type="number" min="-1000000" max="1000000" step="any" value="${valueAttr(state.w1[i][j])}" aria-label="Peso ${source} para h${j + 1}"></td>`;
       html += `</tr>`;
     }
     html += `</table></div></div>`;
@@ -186,7 +197,7 @@
     for (let j = 0; j < hidden + (bias ? 1 : 0); j++) {
       const source = j < hidden ? `h${j + 1}` : 'bias';
       html += `<tr><th>${source}</th>`;
-      for (let k = 0; k < outputs; k++) html += `<td><input data-kind="w2" data-i="${j}" data-j="${k}" type="number" min="-1000000" max="1000000" step="any" value="${esc(state.w2[j][k])}" aria-label="Peso ${source} para y${k + 1}"></td>`;
+      for (let k = 0; k < outputs; k++) html += `<td><input data-kind="w2" data-i="${j}" data-j="${k}" type="number" min="-1000000" max="1000000" step="any" value="${valueAttr(state.w2[j][k])}" aria-label="Peso ${source} para y${k + 1}"></td>`;
       html += `</tr>`;
     }
     html += `</table></div></div>`;
@@ -214,7 +225,7 @@
     const max = input.max === '' ? Infinity : Number(input.max);
     const valid = Number.isFinite(value) && value >= min && value <= max;
     input.setAttribute('aria-invalid', String(!valid));
-    if (!valid) showSetupFeedback(`Use um número entre ${fmt(min, 6)} e ${fmt(max, 6)}.`);
+    if (!valid) showSetupFeedback(input.value.trim() === '' ? 'Preencha todos os valores antes de iniciar a prática.' : `Use um número entre ${fmt(min, 6)} e ${fmt(max, 6)}.`);
     return valid;
   }
 
@@ -299,6 +310,7 @@
   function startExercise() {
     if (!validateConfiguration() || !syncValuesFromEditor()) return;
     readConfig();
+    if (!validateWeightInitialization()) return;
     state.prevW1 = Array.from({ length: state.w1.length }, () => Array(state.cfg.hidden).fill(0));
     state.prevW2 = Array.from({ length: state.w2.length }, () => Array(state.cfg.outputs).fill(0));
     computeAll();
@@ -347,6 +359,29 @@
     });
     if (valid) showSetupFeedback('', '');
     return valid;
+  }
+
+  function validateWeightInitialization() {
+    const { hidden, outputs } = state.cfg;
+    const same = (left, right) => left.length === right.length && left.every((value, index) => value === right[index]);
+    const allWeights = state.w1.flat().concat(state.w2.flat());
+    if (allWeights.every(value => value === 0)) {
+      showSetupFeedback('Pesos zerados mantêm todos os neurônios iguais. Defina valores pequenos e distintos antes de começar.');
+      return false;
+    }
+    for (let a = 0; a < hidden; a++) {
+      for (let b = a + 1; b < hidden; b++) {
+        const incomingA = state.w1.map(row => row[a]);
+        const incomingB = state.w1.map(row => row[b]);
+        const outgoingA = Array.from({ length: outputs }, (_, k) => state.w2[a][k]);
+        const outgoingB = Array.from({ length: outputs }, (_, k) => state.w2[b][k]);
+        if (same(incomingA, incomingB) && same(outgoingA, outgoingB)) {
+          showSetupFeedback(`h${a + 1} e h${b + 1} têm os mesmos pesos. Diferencie ao menos um peso para evitar simetria.`);
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   function currentStep() { return state.started ? state.steps[state.stepIndex] : null; }
@@ -959,6 +994,7 @@
     state.w2 = [[0.7],[-0.4],[0.2]];
     state.prevW1 = Array.from({length:3},()=>Array(2).fill(0));
     state.prevW2 = Array.from({length:3},()=>Array(1).fill(0));
+    state.weightMode = 'preset';
     resetComputed();
     renderAll();
     el.setupNotice.hidden = true;
@@ -975,6 +1011,7 @@
     state.w2 = Array.from({length:4},()=>Array.from({length:3},()=>rand(-0.5,0.5)));
     state.prevW1 = Array.from({length:5},()=>Array(3).fill(0));
     state.prevW2 = Array.from({length:4},()=>Array(3).fill(0));
+    state.weightMode = 'preset';
     resetComputed();
     renderAll();
     el.setupNotice.hidden = true;
@@ -1043,7 +1080,19 @@
     }
   }));
 
-  el.randomizeBtn.addEventListener('click', () => buildFreshValues({randomize:true}));
+  el.manualWeightsBtn.addEventListener('click', () => {
+    state.weightMode = 'manual';
+    state.w1 = Array.from({ length: state.cfg.inputs + (state.cfg.bias ? 1 : 0) }, () => Array(state.cfg.hidden).fill(null));
+    state.w2 = Array.from({ length: state.cfg.hidden + (state.cfg.bias ? 1 : 0) }, () => Array(state.cfg.outputs).fill(null));
+    resetComputed();
+    renderAll();
+    el.setupNotice.hidden = true;
+    showSetupFeedback('Preencha todos os pesos com valores pequenos e distintos. Pesos zerados ou neurônios idênticos não iniciam a prática.', 'info');
+  });
+  el.randomizeBtn.addEventListener('click', () => {
+    state.weightMode = 'random';
+    buildFreshValues({randomize:true});
+  });
   el.resetAllBtn.addEventListener('click', resetAll);
   el.presetXorBtn.addEventListener('click', applyPresetXor);
   el.presetIrisBtn.addEventListener('click', applyPresetIris);
@@ -1066,11 +1115,11 @@
   let configUpdateTimer;
   const updateConfiguration = () => {
     clearTimeout(configUpdateTimer);
-    buildFreshValues({randomize:false});
+    buildFreshValues({randomize:false, announce:true});
   };
   const scheduleConfigurationUpdate = () => {
     clearTimeout(configUpdateTimer);
-    configUpdateTimer = setTimeout(() => buildFreshValues({randomize:false}), 220);
+    configUpdateTimer = setTimeout(() => buildFreshValues({randomize:false, announce:true}), 220);
   };
   [el.inputCount, el.hiddenCount, el.outputCount, el.learningRate, el.momentum, el.tolerance].forEach(node => {
     node.addEventListener('input', scheduleConfigurationUpdate);

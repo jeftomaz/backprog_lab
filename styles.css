@@ -132,12 +132,14 @@ input[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 3px 
 .preset-block.compact { margin: 0 0 14px; padding: 0 0 14px; }
 .preset-block .mini-title { margin-bottom: 9px; }
 .full-button { width: 100%; margin-top: 10px; }
+.weight-actions { margin-top: 10px; }
 .section-heading { margin: 18px 0 5px; font-size: 16px; }
 .setup-notice { margin: 9px 0; padding: 9px 10px; border-left: 3px solid var(--warning); border-radius: 0 8px 8px 0; background: color-mix(in srgb, var(--warning) 10%, var(--panel)); color: var(--text); font-size: 13px; }
 
 .advanced-settings, .secondary-actions { margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-2); }
 .advanced-settings > summary, .secondary-actions > summary { cursor: pointer; padding: 11px 12px; color: var(--text); font-size: 14px; font-weight: 800; }
 .advanced-settings > .field-grid { padding: 4px 12px 13px; }
+.advanced-settings > .architecture-help { margin: 0; padding: 0 12px 5px; }
 .advanced-settings.nested { margin: 0 12px 13px; background: var(--panel); }
 .advanced-settings.nested > .field-grid { padding-top: 4px; }
 .secondary-actions { margin-top: 16px; }
@@ -310,7 +312,7 @@ button:disabled { opacity: .42; cursor: not-allowed; transform: none; }
 .help-dialog { width: min(540px, 100%); max-height: min(520px, calc(100vh - 40px)); overflow: auto; border: 1px solid var(--border); border-radius: 18px; background: var(--panel); box-shadow: 0 24px 70px rgba(0, 0, 0, .35); }
 .help-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 17px 18px 12px; border-bottom: 1px solid var(--border); }
 .help-dialog-head h2 { margin: 0; font-size: 18px; }
-.help-dialog-body { padding: 17px 18px 20px; color: var(--text); font-size: 14px; line-height: 1.65; }
+.help-dialog-body { padding: 17px 18px 20px; color: var(--text); font-size: 14px; line-height: 1.65; white-space: pre-line; }
 
 @media (max-width: 1380px) {
   :root { --sidebar-w: 380px; }

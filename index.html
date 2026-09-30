@@ -27,7 +27,9 @@
       <div class="sidebar-panels">
         <section class="sidebar-panel active" id="setupPanel">
           <h2>Prepare o exercício</h2>
-          <p class="panel-help">Escolha um exemplo ou personalize os dados. Este é o único local de edição da rede.</p>
+          <p class="panel-help">Escolha um exemplo ou personalize os dados. Este é o único local de edição da rede; clique em <strong>?</strong> para entender cada termo.</p>
+
+          <button class="secondary full-button setup-guide" data-help="guide">Guia rápido: entradas, alvos e saídas</button>
 
           <div class="preset-block compact">
             <span class="mini-title">Começar com um exemplo</span>
@@ -37,17 +39,18 @@
             </div>
           </div>
 
-          <details class="advanced-settings">
-            <summary>Configuração da rede</summary>
+          <details class="advanced-settings" open>
+            <summary>Arquitetura da rede — personalize aqui <button class="help-icon" data-help="architecture" aria-label="Explicar arquitetura da rede">?</button></summary>
+            <p class="matrix-help architecture-help">Altere as quantidades; as tabelas de entradas, alvos e pesos são atualizadas automaticamente.</p>
             <div class="field-grid two">
-              <label><span class="field-title">Entradas</span>
-                <input id="inputCount" type="number" min="1" max="8" value="2" />
+              <label><span class="field-title">Entradas <button class="help-icon" data-help="inputCount" aria-label="Explicar quantidade de entradas">?</button></span>
+                <input id="inputCount" type="number" min="1" max="8" step="1" inputmode="numeric" value="2" />
               </label>
-              <label><span class="field-title">Ocultos</span>
-                <input id="hiddenCount" type="number" min="1" max="8" value="2" />
+              <label><span class="field-title">Neurônios ocultos <button class="help-icon" data-help="hiddenCount" aria-label="Explicar neurônios ocultos">?</button></span>
+                <input id="hiddenCount" type="number" min="1" max="8" step="1" inputmode="numeric" value="2" />
               </label>
-              <label><span class="field-title">Saídas</span>
-                <input id="outputCount" type="number" min="1" max="6" value="1" />
+              <label><span class="field-title">Saídas <button class="help-icon" data-help="outputCount" aria-label="Explicar quantidade de saídas">?</button></span>
+                <input id="outputCount" type="number" min="1" max="6" step="1" inputmode="numeric" value="1" />
               </label>
               <div class="check-field">
                 <label><input id="useBias" type="checkbox" checked /> Usar bias (= 1)</label>
@@ -82,7 +85,13 @@
           <p id="setupNotice" class="setup-notice" hidden>Alterar estes dados reinicia a prática atual.</p>
           <p id="setupFeedback" class="feedback" aria-live="polite"></p>
           <div id="valuesEditor" class="values-editor"></div>
-          <button id="randomizeBtn" class="secondary full-button">Sortear pesos</button>
+          <div class="button-row weight-actions">
+            <div class="button-with-help">
+              <button id="manualWeightsBtn" class="secondary">Definir pesos manualmente</button>
+              <button class="help-icon" data-help="manualWeights" aria-label="Explicar definição manual de pesos">?</button>
+            </div>
+            <button id="randomizeBtn" class="secondary">Sortear pesos</button>
+          </div>
           <button id="startBtn" class="primary full-button">Começar prática</button>
         </section>
 

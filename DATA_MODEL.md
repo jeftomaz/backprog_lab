@@ -4,9 +4,14 @@
 | --- | --- | --- |
 | Configuração | `inputs`, `hidden`, `outputs`, `eta`, `alpha`, `tolerance`, `bias` | memória do navegador |
 | Dados conhecidos | `x`, `t`, `w1`, `w2` | memória do navegador |
+| Preparação | `weightMode` | memória do navegador |
 | Caderno | `work`, `resultAnswers`, `resultCorrect` | memória do navegador |
 
 Não há banco, rotas, contas ou dados remotos. Valores numéricos são convertidos e validados antes de entrar no estado.
+
+Cada saída calculada `yₖ` tem um alvo conhecido `tₖ`: ambos têm a mesma cardinalidade, mas `yₖ` é a previsão e `tₖ` é a resposta desejada usada no erro.
+
+No modo manual, pesos pendentes usam `null` até serem preenchidos; a prática valida ausência, todos os pesos zerados e simetria completa entre neurônios ocultos.
 
 ## Limites
 
