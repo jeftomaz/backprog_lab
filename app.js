@@ -14,6 +14,69 @@
   const deepCopy = (m) => m.map(r => r.slice());
   const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 
+  function evaluateCalculatorExpression(source) {
+    const input = String(source ?? '').trim().toLowerCase().replaceAll('×', '*').replaceAll('÷', '/').replaceAll('−', '-').replaceAll('π', 'pi').replaceAll('√', 'sqrt').replace(/,/g, '.');
+    if (!input || input.length > 200) throw new Error('Digite uma expressão de até 200 caracteres.');
+    const tokens = [];
+    for (let pos = 0; pos < input.length;) {
+      if (/\s/.test(input[pos])) { pos++; continue; }
+      const number = input.slice(pos).match(/^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?/);
+      if (number) { tokens.push({ type: 'number', value: Number(number[0]) }); pos += number[0].length; continue; }
+      const name = input.slice(pos).match(/^[a-z]+/);
+      if (name) { tokens.push({ type: 'name', value: name[0] }); pos += name[0].length; continue; }
+      if ('+-*/^()'.includes(input[pos])) { tokens.push({ type: input[pos], value: input[pos] }); pos++; continue; }
+      throw new Error('Use somente números, operadores e funções da calculadora.');
+    }
+
+    let index = 0;
+    const peek = () => tokens[index];
+    const take = (type) => peek()?.type === type && (index++, true);
+    const require = (type) => { if (!take(type)) throw new Error('Expressão incompleta ou com parênteses incorretos.'); };
+    const finite = (value) => { if (!Number.isFinite(value)) throw new Error('O resultado não é um número finito.'); return value; };
+    const parseExpression = () => {
+      let value = parseTerm();
+      while (peek()?.type === '+' || peek()?.type === '-') value = peek().type === '+' ? (index++, finite(value + parseTerm())) : (index++, finite(value - parseTerm()));
+      return value;
+    };
+    const parseTerm = () => {
+      let value = parseUnary();
+      while (peek()?.type === '*' || peek()?.type === '/') {
+        const operator = peek().type;
+        index++;
+        const right = parseUnary();
+        if (operator === '/' && right === 0) throw new Error('Não é possível dividir por zero.');
+        value = finite(operator === '*' ? value * right : value / right);
+      }
+      return value;
+    };
+    const parseUnary = () => take('+') ? parseUnary() : take('-') ? finite(-parseUnary()) : parsePower();
+    const parsePower = () => {
+      let value = parsePrimary();
+      if (take('^')) value = finite(Math.pow(value, parseUnary()));
+      return value;
+    };
+    const parsePrimary = () => {
+      const token = peek();
+      if (!token) throw new Error('Complete a expressão para calcular.');
+      if (token.type === 'number') { index++; return token.value; }
+      if (take('(')) { const value = parseExpression(); require(')'); return value; }
+      if (token.type !== 'name') throw new Error('Expressão inválida.');
+      index++;
+      if (token.value === 'pi') return Math.PI;
+      if (token.value === 'e') return Math.E;
+      const functions = { sqrt: Math.sqrt, ln: Math.log, log: Math.log10, exp: Math.exp, sin: Math.sin, cos: Math.cos, tan: Math.tan, abs: Math.abs };
+      const fn = functions[token.value];
+      if (!fn) throw new Error(`Função “${token.value}” não é suportada.`);
+      require('(');
+      const value = finite(fn(parseExpression()));
+      require(')');
+      return value;
+    };
+    const result = finite(parseExpression());
+    if (index !== tokens.length) throw new Error('Verifique os operadores da expressão.');
+    return result;
+  }
+
   const el = {
     sidebar: $('sidebar'), sidebarScrim: $('sidebarScrim'), openSidebarBtn: $('openSidebarBtn'), closeSidebarBtn: $('closeSidebarBtn'),
     inputCount: $('inputCount'), hiddenCount: $('hiddenCount'), outputCount: $('outputCount'), learningRate: $('learningRate'), momentum: $('momentum'), tolerance: $('tolerance'),
@@ -24,8 +87,9 @@
     themeBtn: $('themeBtn'), themeIcon: $('themeIcon'), themeText: $('themeText'),
     networkDiagram: $('networkDiagram'), focusInfo: $('focusInfo'),
     stepTitle: $('stepTitle'), stepCounter: $('stepCounter'), stepContext: $('stepContext'), formulaStatic: $('formulaStatic'), formulaValues: $('formulaValues'), formulaLegend: $('formulaLegend'),
-    resultBlock: $('resultBlock'), resultPrompt: $('resultPrompt'),
+    resultBlock: $('resultBlock'), resultPrompt: $('resultPrompt'), answerLabel: $('answerLabel'), answerSuccess: $('answerSuccess'),
     answerInput: $('answerInput'), checkBtn: $('checkBtn'), feedback: $('feedback'), prevBtn: $('prevBtn'), nextBtn: $('nextBtn'), hintBtn: $('hintBtn'), revealBtn: $('revealBtn'),
+    calculatorInput: $('calculatorInput'), calculatorEvaluate: $('calculatorEvaluate'), calculatorResult: $('calculatorResult'), useCalculatorResultBtn: $('useCalculatorResultBtn'),
     codeSnippet: $('codeSnippet'), neuronInspector: $('neuronInspector'), summaryTables: $('summaryTables'),
     helpModal: $('helpModal'), helpTitle: $('helpTitle'), helpBody: $('helpBody'), closeHelpBtn: $('closeHelpBtn')
   };
@@ -50,7 +114,7 @@
     formula: ['Fórmula simbólica', 'Mostra a equação da etapa em notação de texto, com símbolos gregos como η, α e δ.'],
     substitution: ['Substituição automática', 'Substitui na fórmula os mesmos valores definidos na Preparação e os resultados que você já validou. Não é necessário copiá-los para outro formulário.'],
     variables: ['Dados usados', 'Esta lista mostra a origem de cada valor da fórmula atual. Valores calculados em etapas anteriores são liberados somente depois de você resolvê-los.'],
-    result: ['Resultado da etapa', 'Faça a conta mostrada acima e insira somente o resultado pedido. Quando aceito, ele é registrado no caderno e passa a ser usado nas fórmulas seguintes.']
+    result: ['Resposta do neurônio', 'O símbolo pedido aparece acima do campo de resposta. Digite somente o número calculado — vírgula ou ponto são aceitos. Quando a resposta for correta, a confirmação verde mostra o valor aceito e libera a próxima etapa. A calculadora científica pode preencher este campo com o resultado obtido.']
   };
 
   function helpButton(topic, label = 'Explicar este item') {
@@ -67,6 +131,7 @@
     steps: [], stepIndex: -1, started: false,
     work: {}, resultAnswers: {}, resultCorrect: {}, revealed: {},
     focus: null, focusFromStep: true,
+    calculatorResult: NaN,
     weightMode: 'preset'
   };
 
@@ -212,12 +277,16 @@
     const j = Number(e.target.dataset.j);
     const v = parseNum(e.target.value);
     if (!validateDataInput(e.target, v)) return;
-    if (kind === 'x') state.x[i] = v;
-    if (kind === 't') state.t[i] = v;
-    if (kind === 'w1') state.w1[i][j] = v;
-    if (kind === 'w2') state.w2[i][j] = v;
+    setKnownValue(kind, i, j, v);
     showSetupFeedback('', '');
     refreshAfterDataEdit();
+  }
+
+  function setKnownValue(kind, i, j, value) {
+    if (kind === 'x') state.x[i] = value;
+    if (kind === 't') state.t[i] = value;
+    if (kind === 'w1') state.w1[i][j] = value;
+    if (kind === 'w2') state.w2[i][j] = value;
   }
 
   function validateDataInput(input, value) {
@@ -352,10 +421,7 @@
     el.valuesEditor.querySelectorAll('input').forEach(inp => {
       const kind = inp.dataset.kind, i = Number(inp.dataset.i), j = Number(inp.dataset.j), v = parseNum(inp.value);
       if (!validateDataInput(inp, v)) { valid = false; return; }
-      if (kind === 'x') state.x[i] = v;
-      if (kind === 't') state.t[i] = v;
-      if (kind === 'w1') state.w1[i][j] = v;
-      if (kind === 'w2') state.w2[i][j] = v;
+      setKnownValue(kind, i, j, v);
     });
     if (valid) showSetupFeedback('', '');
     return valid;
@@ -607,7 +673,11 @@
       el.progressBar.style.width = '0%';
       el.phaseLabel.textContent = 'Aguardando início';
       el.resultPrompt.textContent = 'Insira o resultado calculado.';
+      el.answerLabel.textContent = 'A resposta será inserida aqui quando a prática começar';
       el.answerInput.value = '';
+      el.answerInput.placeholder = 'Resultado numérico';
+      el.answerInput.setAttribute('aria-label', 'Resposta da etapa atual');
+      el.answerInput.setAttribute('aria-invalid', 'false');
       el.answerInput.disabled = true;
       el.checkBtn.disabled = true;
       el.prevBtn.disabled = true;
@@ -615,7 +685,10 @@
       el.hintBtn.disabled = true;
       el.revealBtn.disabled = true;
       el.resultBlock.classList.add('locked');
+      el.resultBlock.classList.remove('is-correct');
       el.feedback.textContent = '';
+      el.answerSuccess.hidden = true;
+      el.useCalculatorResultBtn.disabled = true;
       return;
     }
 
@@ -630,18 +703,27 @@
     el.formulaValues.textContent = spec.substitution;
     el.formulaLegend.innerHTML = spec.vars.map(v => `<div><strong>${esc(v.symbol)}</strong> = ${esc(Number.isFinite(v.value) ? fmt(v.value, 8) : '?')}</div><div class="formula-source">${esc(v.desc)}</div>`).join('');
     el.codeSnippet.textContent = spec.code;
-    el.resultPrompt.textContent = `Calcule ${spec.resultSymbol} e insira somente o resultado.`;
+    el.resultPrompt.textContent = `Calcule ${spec.resultSymbol}; este é o valor que o neurônio deve responder nesta etapa.`;
+    el.answerLabel.textContent = `Digite aqui o valor de ${spec.resultSymbol}`;
+    el.answerInput.placeholder = `Resultado de ${spec.resultSymbol}`;
+    el.answerInput.setAttribute('aria-label', `Resposta para ${spec.resultSymbol}`);
+    el.answerInput.setAttribute('aria-invalid', 'false');
     el.resultBlock.classList.remove('locked');
+    el.resultBlock.classList.toggle('is-correct', resultOk);
     el.answerInput.disabled = resultOk;
     el.checkBtn.disabled = resultOk;
     el.hintBtn.disabled = resultOk;
     el.revealBtn.disabled = resultOk;
     el.answerInput.value = state.resultAnswers[key] ?? '';
-    el.feedback.className = 'feedback';
-    el.feedback.textContent = resultOk ? `Etapa concluída. ${spec.resultSymbol} = ${fmt(state.work[resultIdFor(step)] ?? spec.result, 8)}.` : '';
+    el.feedback.className = resultOk ? 'feedback ok' : 'feedback';
+    el.feedback.textContent = resultOk ? 'Valor aceito e registrado no caderno.' : '';
+    el.answerSuccess.hidden = !resultOk;
+    el.answerSuccess.textContent = resultOk ? `✓ Resposta correta: ${spec.resultSymbol} = ${fmt(state.work[resultIdFor(step)] ?? spec.result, 8)}.` : '';
 
     el.prevBtn.disabled = state.stepIndex === 0;
     el.nextBtn.disabled = !resultOk || state.stepIndex === state.steps.length - 1;
+    el.nextBtn.textContent = resultOk && state.stepIndex < state.steps.length - 1 ? 'Próxima etapa →' : 'Próximo →';
+    el.useCalculatorResultBtn.disabled = !Number.isFinite(state.calculatorResult) || resultOk;
     const done = new Set([
       ...Object.entries(state.resultCorrect).filter(([,v]) => v).map(([k]) => k),
       ...Object.entries(state.revealed).filter(([,v]) => v).map(([k]) => k)
@@ -668,17 +750,56 @@
     state.resultCorrect[key] = ok;
     if (ok) {
       state.work[resultIdFor(step)] = spec.result;
-      el.feedback.className = 'feedback ok';
-      el.feedback.textContent = `Correto. ${spec.resultSymbol} = ${fmt(spec.result, 8)}.`;
       el.nextBtn.disabled = state.stepIndex === state.steps.length - 1;
       renderStep();
       renderValuesEditor();
       renderDiagram();
       renderSummary();
     } else {
+      el.answerInput.setAttribute('aria-invalid', 'true');
       el.feedback.className = 'feedback bad';
-      el.feedback.textContent = 'Ainda não. Confira a substituição acima ou abra uma dica.';
+      el.feedback.textContent = 'Resposta ainda não aceita. Confira a substituição, use a calculadora ou abra uma dica e tente novamente.';
     }
+  }
+
+  function setCalculatorMessage(message, type = '') {
+    el.calculatorResult.className = `calculator-result ${type}`;
+    el.calculatorResult.textContent = message;
+  }
+
+  function evaluateCalculator() {
+    try {
+      state.calculatorResult = evaluateCalculatorExpression(el.calculatorInput.value);
+      setCalculatorMessage(`Resultado: ${fmt(state.calculatorResult, 10)}`, 'ok');
+      el.useCalculatorResultBtn.disabled = el.answerInput.disabled;
+    } catch (error) {
+      state.calculatorResult = NaN;
+      setCalculatorMessage(error.message, 'bad');
+      el.useCalculatorResultBtn.disabled = true;
+    }
+  }
+
+  function resetCalculatorResult() {
+    state.calculatorResult = NaN;
+    el.useCalculatorResultBtn.disabled = true;
+    setCalculatorMessage('Digite uma expressão para calcular.');
+  }
+
+  function insertCalculatorText(text) {
+    const start = el.calculatorInput.selectionStart ?? el.calculatorInput.value.length;
+    const end = el.calculatorInput.selectionEnd ?? start;
+    el.calculatorInput.setRangeText(text, start, end, 'end');
+    resetCalculatorResult();
+    el.calculatorInput.focus();
+  }
+
+  function useCalculatorResult() {
+    if (!Number.isFinite(state.calculatorResult) || el.answerInput.disabled) return;
+    el.answerInput.value = fmt(state.calculatorResult, 10);
+    el.answerInput.setAttribute('aria-invalid', 'false');
+    el.feedback.className = 'feedback info';
+    el.feedback.textContent = 'Resultado da calculadora inserido. Confira e selecione “Conferir”.';
+    el.answerInput.focus();
   }
 
   function revealStep() {
@@ -820,7 +941,7 @@
     const weightMode = el.weightLabelMode.value;
     const showLabel = (key) => weightMode === 'always' || (weightMode === 'focus' && sets.active && sets.edges.has(key));
 
-    let svg = `<svg class="network-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Rede neural interativa">`;
+    let svg = `<svg class="network-svg" viewBox="0 0 ${W} ${H}" role="group" aria-label="Rede neural interativa e editável">`;
     svg += `<text class="layer-title" x="${xPos[0]}" y="48" text-anchor="middle">Entradas</text>`;
     svg += `<text class="layer-title" x="${xPos[1]}" y="48" text-anchor="middle">Camada oculta</text>`;
     svg += `<text class="layer-title" x="${xPos[2]}" y="48" text-anchor="middle">Saídas</text>`;
@@ -830,7 +951,7 @@
         const key = `w1:${i}:${j}`;
         const mx = (xPos[0] + xPos[1]) / 2, my = (yi[i] + yh[j]) / 2;
         svg += `<line class="${edgeClass(key)}" x1="${xPos[0] + 31}" y1="${yi[i]}" x2="${xPos[1] - 31}" y2="${yh[j]}"/>`;
-        svg += `<line class="edge-hit" data-edge="${key}" x1="${xPos[0] + 31}" y1="${yi[i]}" x2="${xPos[1] - 31}" y2="${yh[j]}"><title>w1 ${i < inputs ? `x${i+1}` : 'bias'} → h${j+1} = ${fmt(state.w1[i][j], 6)}</title></line>`;
+        svg += `<line class="edge-hit" data-edge="${key}" role="button" tabindex="0" aria-label="Editar peso de ${i < inputs ? `x${i+1}` : 'bias'} para h${j+1}: ${fmt(state.w1[i][j], 6)}" x1="${xPos[0] + 31}" y1="${yi[i]}" x2="${xPos[1] - 31}" y2="${yh[j]}"><title>Editar w1 ${i < inputs ? `x${i+1}` : 'bias'} → h${j+1} = ${fmt(state.w1[i][j], 6)}</title></line>`;
         if (showLabel(key)) svg += `<text class="${labelClass(key)}" x="${mx}" y="${my - 5}" text-anchor="middle">${fmt(state.w1[i][j], 3)}</text>`;
       }
     }
@@ -839,7 +960,7 @@
         const key = `w2:${j}:${k}`;
         const mx = (xPos[1] + xPos[2]) / 2, my = (yh[j] + yo[k]) / 2;
         svg += `<line class="${edgeClass(key)}" x1="${xPos[1] + 31}" y1="${yh[j]}" x2="${xPos[2] - 31}" y2="${yo[k]}"/>`;
-        svg += `<line class="edge-hit" data-edge="${key}" x1="${xPos[1] + 31}" y1="${yh[j]}" x2="${xPos[2] - 31}" y2="${yo[k]}"><title>w2 ${j < hidden ? `h${j+1}` : 'bias'} → y${k+1} = ${fmt(state.w2[j][k], 6)}</title></line>`;
+        svg += `<line class="edge-hit" data-edge="${key}" role="button" tabindex="0" aria-label="Editar peso de ${j < hidden ? `h${j+1}` : 'bias'} para y${k+1}: ${fmt(state.w2[j][k], 6)}" x1="${xPos[1] + 31}" y1="${yh[j]}" x2="${xPos[2] - 31}" y2="${yo[k]}"><title>Editar w2 ${j < hidden ? `h${j+1}` : 'bias'} → y${k+1} = ${fmt(state.w2[j][k], 6)}</title></line>`;
         if (showLabel(key)) svg += `<text class="${labelClass(key)}" x="${mx}" y="${my - 5}" text-anchor="middle">${fmt(state.w2[j][k], 3)}</text>`;
       }
     }
@@ -857,18 +978,13 @@
     for (let k = 0; k < outputs; k++) {
       const key = `out:${k}`;
       svg += nodeSvg({ key, cx:xPos[2], cy:yo[k], label:`y${k+1}`, value:nodeDisplayValue('out', k), cls:'node-output', group:nodeClass(key), kind:'output', index:k });
-      svg += `<text class="target-label" x="${xPos[2]}" y="${yo[k] + 48}" text-anchor="middle">t${k + 1} = ${fmt(state.t[k], 4)}</text>`;
+      svg += `<text class="target-label target-edit" data-target-index="${k}" role="button" tabindex="0" aria-label="Editar alvo t${k + 1}: ${fmt(state.t[k], 4)}" x="${xPos[2]}" y="${yo[k] + 48}" text-anchor="middle">t${k + 1} = ${fmt(state.t[k], 4)}</text>`;
     }
     svg += `</svg>`;
     el.networkDiagram.innerHTML = svg;
 
     el.networkDiagram.querySelectorAll('.node-group').forEach(g => {
-      const inspectNode = () => {
-        state.focusFromStep = false;
-        state.focus = { kind: g.dataset.kind, index: Number(g.dataset.index), back: false };
-        renderDiagram();
-        renderNeuronInspector();
-      };
+      const inspectNode = () => selectDiagramItem({ kind: g.dataset.kind, index: Number(g.dataset.index), back: false });
       g.addEventListener('click', inspectNode);
       g.addEventListener('keydown', e => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -877,7 +993,39 @@
         }
       });
     });
+    el.networkDiagram.querySelectorAll('.edge-hit').forEach(edge => {
+      const inspectEdge = () => {
+        const [matrix, source, target] = edge.dataset.edge.split(':');
+        selectDiagramItem(matrix === 'w1'
+          ? { kind: 'edgeW1', i: Number(source), j: Number(target), back: false }
+          : { kind: 'edgeW2', j: Number(source), k: Number(target), back: false });
+      };
+      edge.addEventListener('click', inspectEdge);
+      edge.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          inspectEdge();
+        }
+      });
+    });
+    el.networkDiagram.querySelectorAll('.target-edit').forEach(target => {
+      const inspectTarget = () => selectDiagramItem({ kind: 'output', index: Number(target.dataset.targetIndex), back: false });
+      target.addEventListener('click', inspectTarget);
+      target.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          inspectTarget();
+        }
+      });
+    });
     updateFocusInfo();
+  }
+
+  function selectDiagramItem(focus) {
+    state.focusFromStep = false;
+    state.focus = focus;
+    renderDiagram();
+    renderNeuronInspector();
   }
 
   function nodeSvg({cx, cy, label, value, cls, group, kind, index}) {
@@ -895,6 +1043,7 @@
     else if (f.kind === 'hiddenBack') el.focusInfo.textContent = `Foco em h${f.index + 1}: erro retornando pelas conexões w2.`;
     else if (f.kind === 'biasHidden') el.focusInfo.textContent = 'Foco no bias da camada oculta.';
     else if (f.kind === 'output') el.focusInfo.textContent = `Foco em y${f.index + 1}: conexões que chegam à saída.`;
+    else if (f.kind === 'edgeW1' || f.kind === 'edgeW2') el.focusInfo.textContent = 'Conexão selecionada: edite seu peso no inspetor.';
     else el.focusInfo.textContent = 'Foco na conexão usada no cálculo atual.';
   }
 
@@ -903,12 +1052,12 @@
     el.neuronInspector.hidden = state.started && state.focusFromStep;
     if (el.neuronInspector.hidden) return;
     if (!f) {
-      el.neuronInspector.innerHTML = `<div class="inspector-empty"><span class="mini-title">Inspetor do neurônio</span><p>Selecione um nó no diagrama para consultar sua equação e seus valores.</p></div>`;
+      el.neuronInspector.innerHTML = `<div class="inspector-empty"><span class="mini-title">Inspetor e editor</span><p>Selecione uma entrada, saída ou conexão no diagrama para consultar e alterar seu valor.</p></div>`;
       return;
     }
 
     const { inputs, hidden, bias } = state.cfg;
-    let title = '', description = '', formula = '', values = [], computed = '';
+    let title = '', description = '', formula = '', values = [], computed = '', edit = null;
     const inputTerms = (j) => Array.from({ length: inputs + (bias ? 1 : 0) }, (_, i) => `${i < inputs ? `x${i + 1}` : 'b'}·w1(${i < inputs ? `x${i + 1}` : 'b'}→h${j + 1})`).join(' + ');
     const hiddenTerms = (k) => Array.from({ length: hidden + (bias ? 1 : 0) }, (_, j) => `${j < hidden ? `O_h${j + 1}` : 'b'}·w2(${j < hidden ? `h${j + 1}` : 'b'}→y${k + 1})`).join(' + ');
 
@@ -917,6 +1066,7 @@
       description = 'Esta entrada participa da soma de todos os neurônios ocultos.';
       formula = `Cada h recebe: z_h = ${inputTerms(0).replace(/h1/g, 'h')}. A contribuição de x${f.index + 1} em cada soma é x${f.index + 1}·w1(x${f.index + 1}→h).`;
       values.push(`x${f.index + 1} = ${fmt(state.x[f.index], 6)}`);
+      edit = { kind: 'x', i: f.index, label: `entrada x${f.index + 1}`, value: state.x[f.index], min: -1000000, max: 1000000 };
       for (let j = 0; j < hidden; j++) values.push(`w1(x${f.index + 1} → h${j + 1}) = ${fmt(state.w1[f.index][j], 6)}`);
     } else if (f.kind === 'biasInput') {
       title = 'Bias de entrada';
@@ -947,21 +1097,47 @@
       for (let j = 0; j < hidden; j++) values.push(`w2(h${j + 1} → y${k + 1}) = ${fmt(state.w2[j][k], 6)}`);
       if (bias) values.push(`w2(b → y${k + 1}) = ${fmt(state.w2[hidden][k], 6)}`);
       values.push(`t${k + 1} = ${fmt(state.t[k], 6)}`);
+      edit = { kind: 't', i: k, label: `alvo t${k + 1}`, value: state.t[k], min: 0, max: 1 };
       if (state.started) computed = `Caderno: z(y${k + 1}) = ${Number.isFinite(state.work[`z2:${k}`]) ? fmt(state.work[`z2:${k}`]) : '—'}; O(y${k + 1}) = ${Number.isFinite(state.work[`o2:${k}`]) ? fmt(state.work[`o2:${k}`]) : '—'}.`;
     } else if (f.kind === 'edgeW1') {
       title = `Conexão ${f.i < inputs ? `x${f.i + 1}` : 'b'} → h${f.j + 1}`;
       description = 'Esta conexão multiplica o valor da origem e o soma ao neurônio oculto de destino.';
       formula = `${f.i < inputs ? `x${f.i + 1}` : 'b'}·w1(${f.i < inputs ? `x${f.i + 1}` : 'b'}→h${f.j + 1})`;
       values.push(`peso = ${fmt(state.w1[f.i][f.j], 6)}`);
+      edit = { kind: 'w1', i: f.i, j: f.j, label: `peso ${f.i < inputs ? `x${f.i + 1}` : 'bias'} → h${f.j + 1}`, value: state.w1[f.i][f.j], min: -1000000, max: 1000000 };
     } else if (f.kind === 'edgeW2') {
       title = `Conexão ${f.j < hidden ? `h${f.j + 1}` : 'b'} → y${f.k + 1}`;
       description = 'Esta conexão leva uma saída oculta (ou bias) para o neurônio de saída.';
       formula = `${f.j < hidden ? `O_h${f.j + 1}` : 'b'}·w2(${f.j < hidden ? `h${f.j + 1}` : 'b'}→y${f.k + 1})`;
       values.push(`peso = ${fmt(state.w2[f.j][f.k], 6)}`);
+      edit = { kind: 'w2', i: f.j, j: f.k, label: `peso ${f.j < hidden ? `h${f.j + 1}` : 'bias'} → y${f.k + 1}`, value: state.w2[f.j][f.k], min: -1000000, max: 1000000 };
     }
 
     const valueList = values.length ? `<div class="inspector-values">${values.map(value => `<span>${esc(value)}</span>`).join('')}</div>` : '';
-    el.neuronInspector.innerHTML = `<div class="inspector-head"><div><span class="mini-title">Inspetor do neurônio</span><h3>${esc(title)}</h3></div></div><p>${esc(description)}</p><div class="inspector-formula">${esc(formula)}</div>${computed ? `<p class="inspector-computed">${esc(computed)}</p>` : ''}${valueList}`;
+    const editor = edit ? `<div class="inspector-editor"><label>Editar ${esc(edit.label)}<input data-visual-edit data-kind="${edit.kind}" data-i="${edit.i}" data-j="${edit.j ?? ''}" data-label="${esc(edit.label)}" type="number" min="${edit.min}" max="${edit.max}" step="any" value="${Number.isFinite(edit.value) ? esc(edit.value) : ''}"></label><button type="button" class="primary" data-apply-visual-edit>Aplicar</button></div>` : '';
+    el.neuronInspector.innerHTML = `<div class="inspector-head"><div><span class="mini-title">Inspetor e editor</span><h3>${esc(title)}</h3></div></div><p>${esc(description)}</p><div class="inspector-formula">${esc(formula)}</div>${computed ? `<p class="inspector-computed">${esc(computed)}</p>` : ''}${editor}${valueList}`;
+    const input = el.neuronInspector.querySelector('[data-visual-edit]');
+    const apply = el.neuronInspector.querySelector('[data-apply-visual-edit]');
+    if (input && apply) {
+      const save = () => applyVisualEdit(input);
+      apply.addEventListener('click', save);
+      input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
+    }
+  }
+
+  function applyVisualEdit(input) {
+    const kind = input.dataset.kind;
+    const i = Number(input.dataset.i);
+    const j = Number(input.dataset.j);
+    const value = parseNum(input.value);
+    if (!validateDataInput(input, value)) return;
+    const hadStarted = state.started;
+    const label = input.dataset.label;
+    if (hadStarted && !window.confirm(`Alterar ${label} reiniciará a prática atual. Continuar?`)) return;
+    setKnownValue(kind, i, j, value);
+    refreshAfterDataEdit();
+    if (hadStarted) el.stepContext.textContent = `${label} atualizado pelo diagrama. A prática foi reiniciada.`;
+    else showSetupFeedback(`${label} atualizado pelo diagrama.`, 'info');
   }
 
   function renderSummary() {
@@ -1101,6 +1277,25 @@
   el.resetProgressBtn.addEventListener('click', resetProgress);
   el.checkBtn.addEventListener('click', checkResult);
   el.answerInput.addEventListener('keydown', e => { if (e.key === 'Enter') checkResult(); });
+  el.answerInput.addEventListener('input', () => el.answerInput.setAttribute('aria-invalid', 'false'));
+  el.calculatorEvaluate.addEventListener('click', evaluateCalculator);
+  el.calculatorInput.addEventListener('input', resetCalculatorResult);
+  el.calculatorInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); evaluateCalculator(); } });
+  document.querySelectorAll('[data-calc-insert]').forEach(btn => btn.addEventListener('click', () => insertCalculatorText(btn.dataset.calcInsert)));
+  document.querySelectorAll('[data-calc-action]').forEach(btn => btn.addEventListener('click', () => {
+    if (btn.dataset.calcAction === 'clear') {
+      el.calculatorInput.value = '';
+      resetCalculatorResult();
+      el.calculatorInput.focus();
+    } else if (btn.dataset.calcAction === 'backspace') {
+      const start = el.calculatorInput.selectionStart ?? el.calculatorInput.value.length;
+      const end = el.calculatorInput.selectionEnd ?? start;
+      el.calculatorInput.setRangeText('', start === end ? Math.max(0, start - 1) : start, end, 'end');
+      resetCalculatorResult();
+      el.calculatorInput.focus();
+    } else evaluateCalculator();
+  }));
+  el.useCalculatorResultBtn.addEventListener('click', useCalculatorResult);
   el.prevBtn.addEventListener('click', () => moveStep(-1));
   el.nextBtn.addEventListener('click', () => moveStep(1));
   el.hintBtn.addEventListener('click', showHint);
@@ -1140,7 +1335,7 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && el.helpModal.classList.contains('is-open')) closeHelp(); });
   document.addEventListener('pointerdown', (e) => {
     if (!state.focus || state.focusFromStep) return;
-    if (e.target.closest('.node-group, #neuronInspector, #helpModal, [data-help]')) return;
+    if (e.target.closest('.node-group, .edge-hit, .target-edit, #neuronInspector, #helpModal, [data-help]')) return;
     if (state.started) syncFocusToStep();
     else {
       state.focus = null;

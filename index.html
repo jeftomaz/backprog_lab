@@ -150,7 +150,7 @@
             <div id="focusInfo" class="focus-info">Nenhum nó selecionado.</div>
           </div>
           <div id="networkDiagram" class="diagram-scroll" aria-label="Diagrama interativo da rede neural"></div>
-          <div class="visual-hint">Clique em um nó para inspecionar seu fluxo. Passe o mouse sobre uma conexão para ver seu peso.</div>
+          <div class="visual-hint">Clique em uma entrada, saída ou conexão para consultar e editar seu valor. Alterações durante a prática pedem confirmação e reiniciam o exercício.</div>
         </details>
 
         <aside class="calc-card" id="calcCard">
@@ -180,14 +180,36 @@
           </section>
 
           <section id="resultBlock" class="result-block locked">
-            <span class="mini-title">Resolva a etapa <button class="help-icon" data-help="result" aria-label="Explicar resultado">?</button></span>
+            <span class="mini-title">Resposta do neurônio <button class="help-icon" data-help="result" aria-label="Explicar resultado">?</button></span>
             <p id="resultPrompt" class="result-prompt">Insira o resultado calculado.</p>
+            <label id="answerLabel" class="answer-label" for="answerInput">Digite sua resposta no campo abaixo</label>
             <div class="answer-row">
-              <input id="answerInput" inputmode="decimal" autocomplete="off" placeholder="Resultado" disabled />
+              <input id="answerInput" inputmode="decimal" autocomplete="off" aria-describedby="feedback answerSuccess" placeholder="Resultado numérico" disabled />
               <button id="checkBtn" class="primary" disabled>Conferir</button>
             </div>
             <p id="feedback" class="feedback" aria-live="polite"></p>
+            <p id="answerSuccess" class="answer-success" role="status" hidden></p>
           </section>
+
+          <details class="scientific-calculator" id="scientificCalculator">
+            <summary>Calculadora científica</summary>
+            <p class="calculator-help">Use <strong>√</strong>, <strong>ln</strong>, <strong>log</strong>, <strong>exp</strong>, <strong>π</strong>, <strong>e</strong>, parênteses e <strong>^</strong>. Trigonometria usa radianos.</p>
+            <div class="calculator-entry">
+              <label class="sr-only" for="calculatorInput">Expressão para calcular</label>
+              <input id="calculatorInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="Ex.: 1 / (1 + exp(-0,3))" />
+              <button id="calculatorEvaluate" type="button" class="secondary">Calcular</button>
+            </div>
+            <div class="calculator-keys" aria-label="Teclas da calculadora">
+              <button type="button" data-calc-insert="7">7</button><button type="button" data-calc-insert="8">8</button><button type="button" data-calc-insert="9">9</button><button type="button" data-calc-insert="/">÷</button><button type="button" data-calc-action="clear">C</button>
+              <button type="button" data-calc-insert="4">4</button><button type="button" data-calc-insert="5">5</button><button type="button" data-calc-insert="6">6</button><button type="button" data-calc-insert="*">×</button><button type="button" data-calc-action="backspace" aria-label="Apagar último caractere">⌫</button>
+              <button type="button" data-calc-insert="1">1</button><button type="button" data-calc-insert="2">2</button><button type="button" data-calc-insert="3">3</button><button type="button" data-calc-insert="-">−</button><button type="button" data-calc-insert="^">xʸ</button>
+              <button type="button" data-calc-insert="0">0</button><button type="button" data-calc-insert=",">,</button><button type="button" data-calc-insert="(">(</button><button type="button" data-calc-insert=")">)</button><button type="button" data-calc-insert="+">+</button>
+              <button type="button" data-calc-insert="sqrt(">√</button><button type="button" data-calc-insert="ln(">ln</button><button type="button" data-calc-insert="log(">log</button><button type="button" data-calc-insert="exp(">eˣ</button><button type="button" data-calc-insert="pi">π</button>
+              <button type="button" data-calc-insert="sin(">sin</button><button type="button" data-calc-insert="cos(">cos</button><button type="button" data-calc-insert="tan(">tan</button><button type="button" data-calc-insert="e">e</button><button type="button" data-calc-action="evaluate">=</button>
+            </div>
+            <p id="calculatorResult" class="calculator-result" aria-live="polite">Digite uma expressão para calcular.</p>
+            <button id="useCalculatorResultBtn" type="button" class="secondary use-calculator-result" disabled>Usar resultado na resposta</button>
+          </details>
 
           <details class="code-ref">
             <summary>Ver trecho equivalente em C</summary>
