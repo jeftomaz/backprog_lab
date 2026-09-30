@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Laboratório visual e interativo para estudar forward propagation e backpropagation passo a passo." />
+  <meta name="color-scheme" content="light dark" />
+  <title>Backprop Lab</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="Menu de estudo">
+      <div class="brand-row">
+        <div>
+          <div class="brand">Backprop Lab</div>
+          <div class="brand-sub">Rede neural, passo a passo</div>
+        </div>
+        <button id="closeSidebarBtn" class="icon-btn mobile-only" aria-label="Fechar menu">×</button>
+      </div>
+
+      <nav class="section-nav" aria-label="Seções">
+        <button class="section-tab active" data-panel="setupPanel"><span>1</span> Preparação</button>
+        <button class="section-tab" data-panel="practicePanel"><span>2</span> Prática</button>
+      </nav>
+
+      <div class="sidebar-panels">
+        <section class="sidebar-panel active" id="setupPanel">
+          <h2>Prepare o exercício</h2>
+          <p class="panel-help">Escolha um exemplo ou personalize os dados. Este é o único local de edição da rede.</p>
+
+          <div class="preset-block compact">
+            <span class="mini-title">Começar com um exemplo</span>
+            <div class="button-row">
+              <button id="presetXorBtn" class="secondary">XOR</button>
+              <button id="presetIrisBtn" class="secondary">Iris</button>
+            </div>
+          </div>
+
+          <details class="advanced-settings">
+            <summary>Configuração da rede</summary>
+            <div class="field-grid two">
+              <label><span class="field-title">Entradas</span>
+                <input id="inputCount" type="number" min="1" max="8" value="2" />
+              </label>
+              <label><span class="field-title">Ocultos</span>
+                <input id="hiddenCount" type="number" min="1" max="8" value="2" />
+              </label>
+              <label><span class="field-title">Saídas</span>
+                <input id="outputCount" type="number" min="1" max="6" value="1" />
+              </label>
+              <div class="check-field">
+                <label><input id="useBias" type="checkbox" checked /> Usar bias (= 1)</label>
+                <button class="help-icon" data-help="bias" aria-label="Explicar bias">?</button>
+              </div>
+            </div>
+
+            <details class="advanced-settings nested">
+              <summary>Parâmetros avançados</summary>
+              <div class="field-grid two">
+                <label><span class="field-title">η aprendizado <button class="help-icon" data-help="learningRate" aria-label="Explicar taxa de aprendizado">?</button></span>
+                  <input id="learningRate" type="number" min="0" max="1" step="0.01" value="0.5" />
+                </label>
+                <label><span class="field-title">α momentum <button class="help-icon" data-help="momentum" aria-label="Explicar momentum">?</button></span>
+                  <input id="momentum" type="number" min="0" max="1" step="0.01" value="0" />
+                </label>
+                <label><span class="field-title">Tolerância <button class="help-icon" data-help="tolerance" aria-label="Explicar tolerância">?</button></span>
+                  <input id="tolerance" type="number" min="0.000001" max="1" step="0.0001" value="0.002" />
+                </label>
+                <label><span class="field-title">Exibir pesos</span>
+                  <select id="weightLabelMode">
+                    <option value="focus" selected>Apenas no foco</option>
+                    <option value="always">Sempre</option>
+                    <option value="never">Nunca</option>
+                  </select>
+                </label>
+              </div>
+            </details>
+          </details>
+
+          <h3 class="section-heading">Dados conhecidos <button class="help-icon" data-help="values" aria-label="Explicar valores">?</button></h3>
+          <p id="setupNotice" class="setup-notice" hidden>Alterar estes dados reinicia a prática atual.</p>
+          <p id="setupFeedback" class="feedback" aria-live="polite"></p>
+          <div id="valuesEditor" class="values-editor"></div>
+          <button id="randomizeBtn" class="secondary full-button">Sortear pesos</button>
+          <button id="startBtn" class="primary full-button">Começar prática</button>
+        </section>
+
+        <section class="sidebar-panel" id="practicePanel">
+          <h2>Prática guiada</h2>
+          <p class="panel-help">Resolva uma fórmula por vez. Cada resposta aceita libera a etapa seguinte.</p>
+          <div class="progress-card">
+            <div class="progress-head"><span>Progresso</span><strong id="progressBadge">0 / 0</strong></div>
+            <div class="progress-track"><div id="progressBar" class="progress-fill"></div></div>
+            <div id="phaseLabel" class="phase-label">Aguardando início</div>
+          </div>
+
+          <button id="editSetupBtn" class="primary full-button">Editar dados</button>
+
+          <details class="secondary-actions">
+            <summary>Outras ações</summary>
+            <div class="button-stack">
+              <button id="resetProgressBtn" class="secondary">Recomeçar prática</button>
+              <button id="exportBtn" class="secondary">Exportar estado (.json)</button>
+              <button id="resetAllBtn" class="ghost">Restaurar exemplo XOR</button>
+            </div>
+          </details>
+        </section>
+      </div>
+
+      <div class="sidebar-footer">
+        <button id="themeBtn" class="theme-btn" aria-label="Alternar tema"><span id="themeIcon">◐</span><span id="themeText">Tema escuro</span></button>
+      </div>
+    </aside>
+
+    <div id="sidebarScrim" class="sidebar-scrim" aria-hidden="true"></div>
+
+    <main class="main-area">
+      <header class="main-header">
+        <div class="header-left">
+          <button id="openSidebarBtn" class="icon-btn mobile-only" aria-label="Abrir menu">☰</button>
+          <div>
+            <h1>Prática de backpropagation</h1>
+            <p>Prepare a rede e acompanhe cada cálculo no diagrama.</p>
+          </div>
+        </div>
+      </header>
+
+      <section class="study-layout">
+        <details class="visual-card diagram-card" open>
+          <summary class="diagram-toggle">Visualização da rede</summary>
+          <div class="visual-toolbar">
+            <div class="legend-inline">
+              <span><i class="legend-dot input"></i> entrada</span>
+              <span><i class="legend-dot hidden"></i> oculto</span>
+              <span><i class="legend-dot output"></i> saída</span>
+              <span><i class="legend-line forward"></i> forward</span>
+              <span><i class="legend-line back"></i> backprop</span>
+              <button class="help-icon" data-help="diagram" aria-label="Explicar visualização">?</button>
+            </div>
+            <div id="focusInfo" class="focus-info">Nenhum nó selecionado.</div>
+          </div>
+          <div id="networkDiagram" class="diagram-scroll" aria-label="Diagrama interativo da rede neural"></div>
+          <div class="visual-hint">Clique em um nó para inspecionar seu fluxo. Passe o mouse sobre uma conexão para ver seu peso.</div>
+        </details>
+
+        <aside class="calc-card" id="calcCard">
+          <div class="calc-head">
+            <div>
+              <span class="eyebrow">Cálculo atual</span>
+              <h2 id="stepTitle">Configure a rede para começar</h2>
+            </div>
+            <span id="stepCounter" class="step-counter">—</span>
+          </div>
+
+          <div id="stepContext" class="step-context">Revise os dados na <strong>Preparação</strong> e selecione <strong>Começar prática</strong>.</div>
+
+          <div class="formula-box">
+            <span class="formula-label">Fórmula simbólica <button class="help-icon" data-help="formula" aria-label="Explicar fórmula">?</button></span>
+            <div id="formulaStatic" class="formula">—</div>
+          </div>
+
+          <div class="formula-box substitution-box">
+            <span class="formula-label">Substituição automática <button class="help-icon" data-help="substitution" aria-label="Explicar substituição">?</button></span>
+            <div id="formulaValues" class="formula">—</div>
+          </div>
+
+          <section class="given-values-block">
+            <span class="mini-title">Dados usados nesta etapa <button class="help-icon" data-help="variables" aria-label="Explicar dados da etapa">?</button></span>
+            <div id="formulaLegend" class="formula-legend"></div>
+          </section>
+
+          <section id="resultBlock" class="result-block locked">
+            <span class="mini-title">Resolva a etapa <button class="help-icon" data-help="result" aria-label="Explicar resultado">?</button></span>
+            <p id="resultPrompt" class="result-prompt">Insira o resultado calculado.</p>
+            <div class="answer-row">
+              <input id="answerInput" inputmode="decimal" autocomplete="off" placeholder="Resultado" disabled />
+              <button id="checkBtn" class="primary" disabled>Conferir</button>
+            </div>
+            <p id="feedback" class="feedback" aria-live="polite"></p>
+          </section>
+
+          <details class="code-ref">
+            <summary>Ver trecho equivalente em C</summary>
+            <pre><code id="codeSnippet">—</code></pre>
+          </details>
+
+          <section id="neuronInspector" class="neuron-inspector" aria-live="polite"></section>
+
+          <div class="step-actions">
+            <button id="prevBtn" class="ghost">← Anterior</button>
+            <button id="hintBtn" class="secondary" disabled>Dica</button>
+            <button id="revealBtn" class="secondary" disabled>Mostrar resposta</button>
+            <button id="nextBtn" class="primary">Próximo →</button>
+          </div>
+        </aside>
+      </section>
+
+      <details class="summary-drawer">
+        <summary>Caderno de resultados</summary>
+        <div id="summaryTables" class="summary-grid"></div>
+      </details>
+    </main>
+  </div>
+
+  <div id="helpModal" class="help-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <div class="help-dialog">
+      <div class="help-dialog-head">
+        <h2 id="helpTitle">Explicação</h2>
+        <button id="closeHelpBtn" class="icon-btn" aria-label="Fechar explicação">×</button>
+      </div>
+      <div id="helpBody" class="help-dialog-body"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
