@@ -5,4 +5,4 @@
 - [done] Fluxo simplificado em Preparação e Prática, sem editores ou resultados duplicados.
 - [done] Arquitetura personalizável visível, ajuda contextual e definição manual segura dos pesos.
 - [done] Workflow de deploy estático no GitHub Pages.
-- [doing] Publicar a branch `main` no remoto e configurar GitHub Pages para usar GitHub Actions.
+- [done] Publicada a branch `main` no remoto com GitHub Pages configurado para usar GitHub Actions.
