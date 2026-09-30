@@ -86,7 +86,8 @@
     progressBadge: $('progressBadge'), progressBar: $('progressBar'), phaseLabel: $('phaseLabel'),
     themeBtn: $('themeBtn'), themeIcon: $('themeIcon'), themeText: $('themeText'),
     networkDiagram: $('networkDiagram'), focusInfo: $('focusInfo'),
-    stepTitle: $('stepTitle'), stepCounter: $('stepCounter'), stepContext: $('stepContext'), formulaStatic: $('formulaStatic'), formulaValues: $('formulaValues'), formulaLegend: $('formulaLegend'),
+    stepTitle: $('stepTitle'), stepCounter: $('stepCounter'), stepContext: $('stepContext'), formulaStatic: $('formulaStatic'), formulaValues: $('formulaValues'),
+    operationModeBtn: $('operationModeBtn'), operationsHelp: $('operationsHelp'), operationInputs: $('operationInputs'),
     resultBlock: $('resultBlock'), resultPrompt: $('resultPrompt'), answerLabel: $('answerLabel'), answerSuccess: $('answerSuccess'),
     answerInput: $('answerInput'), checkBtn: $('checkBtn'), feedback: $('feedback'), prevBtn: $('prevBtn'), nextBtn: $('nextBtn'), hintBtn: $('hintBtn'), revealBtn: $('revealBtn'),
     calculatorInput: $('calculatorInput'), calculatorEvaluate: $('calculatorEvaluate'), calculatorResult: $('calculatorResult'), useCalculatorResultBtn: $('useCalculatorResultBtn'),
@@ -130,6 +131,7 @@
     z1: [], o1: [], z2: [], o2: [], e2: [], d2: [], r1: [], d1: [], nw1: [], nw2: [],
     steps: [], stepIndex: -1, started: false,
     work: {}, resultAnswers: {}, resultCorrect: {}, revealed: {},
+    operationAnswers: {}, operationCorrect: {}, operationModes: {},
     focus: null, focusFromStep: true,
     calculatorResult: NaN,
     weightMode: 'preset'
@@ -190,6 +192,9 @@
     state.resultAnswers = {};
     state.resultCorrect = {};
     state.revealed = {};
+    state.operationAnswers = {};
+    state.operationCorrect = {};
+    state.operationModes = {};
     state.focus = null;
     state.focusFromStep = true;
   }
@@ -390,6 +395,9 @@
     state.resultAnswers = {};
     state.resultCorrect = {};
     state.revealed = {};
+    state.operationAnswers = {};
+    state.operationCorrect = {};
+    state.operationModes = {};
     state.focusFromStep = true;
     syncFocusToStep();
     renderAll();
@@ -407,6 +415,9 @@
     state.resultAnswers = {};
     state.resultCorrect = {};
     state.revealed = {};
+    state.operationAnswers = {};
+    state.operationCorrect = {};
+    state.operationModes = {};
     state.focusFromStep = true;
     syncFocusToStep();
     renderStep();
@@ -659,6 +670,162 @@
     return { vars, formula, substitution, context, code, result: resultFor(step), resultSymbol };
   }
 
+  function operationPiecesFor(step) {
+    if (!step) return [];
+    const { inputs, hidden, outputs, eta, alpha, bias } = state.cfg;
+    const learned = (id) => state.work[id];
+    const subscript = (n) => String(n).replace(/\d/g, d => '₀₁₂₃₄₅₆₇₈₉'[d]);
+    const x = (i) => `x${subscript(i + 1)}`;
+    const h = (j) => `h${subscript(j + 1)}`;
+    const y = (k) => `y${subscript(k + 1)}`;
+    const oH = (j) => `O(${h(j)})`;
+    const oY = (k) => `O(${y(k)})`;
+    const dH = (j) => `δ(${h(j)})`;
+    const dY = (k) => `δ(${y(k)})`;
+    const w1 = (i, j) => `w(${i < inputs ? x(i) : 'b'}→${h(j)})`;
+    const w2 = (j, k) => `w(${j < hidden ? h(j) : 'b'}→${y(k)})`;
+
+    if (step.type === 'z1') {
+      return Array.from({ length: inputs + (bias ? 1 : 0) }, (_, i) => ({
+        expression: `${i < inputs ? x(i) : 'b'} · ${w1(i, step.j)}`,
+        expected: (i < inputs ? state.x[i] : 1) * state.w1[i][step.j]
+      }));
+    }
+    if (step.type === 'z2') {
+      return Array.from({ length: hidden + (bias ? 1 : 0) }, (_, j) => ({
+        expression: `${j < hidden ? oH(j) : 'b'} · ${w2(j, step.k)}`,
+        expected: (j < hidden ? learned(`o1:${j}`) : 1) * state.w2[j][step.k]
+      }));
+    }
+    if (step.type === 'r1') {
+      return Array.from({ length: outputs }, (_, k) => ({
+        expression: `${dY(k)} · ${w2(step.j, k)}`,
+        expected: learned(`d2:${k}`) * state.w2[step.j][k]
+      }));
+    }
+    if (step.type === 'd2') {
+      const output = learned(`o2:${step.k}`);
+      return [{ expression: `1 − ${oY(step.k)}`, expected: 1 - output }];
+    }
+    if (step.type === 'd1') {
+      const output = learned(`o1:${step.j}`);
+      return [{ expression: `1 − ${oH(step.j)}`, expected: 1 - output }];
+    }
+    if (step.type === 'nw2' || step.type === 'nw1') {
+      const isOutputWeight = step.type === 'nw2';
+      const activation = isOutputWeight ? (step.j < hidden ? learned(`o1:${step.j}`) : 1) : (step.i < inputs ? state.x[step.i] : 1);
+      const delta = isOutputWeight ? learned(`d2:${step.k}`) : learned(`d1:${step.j}`);
+      const destination = isOutputWeight ? dY(step.k) : dH(step.j);
+      const source = isOutputWeight ? (step.j < hidden ? oH(step.j) : 'b') : (step.i < inputs ? x(step.i) : 'b');
+      const pieces = [{ expression: `η · ${destination} · ${source}`, expected: eta * delta * activation }];
+      if (alpha !== 0) {
+        const previous = isOutputWeight ? state.prevW2[step.j]?.[step.k] ?? 0 : state.prevW1[step.i]?.[step.j] ?? 0;
+        pieces.push({ expression: 'α · Δw_anterior', expected: alpha * previous });
+      }
+      return pieces;
+    }
+    return [];
+  }
+
+  function operationKey(step, index) {
+    return `${stepKey(step)}:operation:${index}`;
+  }
+
+  function renderOperationInputs(step, resultOk = false) {
+    const pieces = operationPiecesFor(step);
+    if (!step || !pieces.length) {
+      el.operationModeBtn.hidden = true;
+      el.operationInputs.innerHTML = '';
+      el.operationsHelp.textContent = step ? 'Esta fórmula é resolvida diretamente no resultado abaixo.' : 'Use os valores realçados no diagrama para resolver a fórmula.';
+      return { pieces, detailed: false, ready: true };
+    }
+
+    const detailed = !!state.operationModes[stepKey(step)];
+    const ready = !detailed || pieces.every((_, index) => state.operationCorrect[operationKey(step, index)]);
+    el.operationModeBtn.hidden = false;
+    el.operationModeBtn.disabled = resultOk;
+    el.operationModeBtn.textContent = detailed ? 'Usar resultado direto' : 'Registrar operações';
+    el.operationsHelp.textContent = detailed
+      ? 'Confirme cada operação abaixo. Depois, some ou aplique a fórmula para registrar o resultado final.'
+      : 'Use os valores realçados no diagrama. Você pode registrar cada operação antes do resultado final.';
+
+    if (!detailed) {
+      el.operationInputs.innerHTML = '';
+      return { pieces, detailed, ready };
+    }
+
+    el.operationInputs.innerHTML = pieces.map((piece, index) => {
+      const key = operationKey(step, index);
+      const accepted = !!state.operationCorrect[key];
+      const locked = accepted || resultOk;
+      const answer = state.operationAnswers[key] ?? '';
+      return `<div class="operation-row ${accepted ? 'is-correct' : ''}">
+        <label for="operationInput${index}"><span>Operação ${index + 1}</span><strong>${esc(piece.expression)}</strong></label>
+        <div class="operation-answer-row">
+          <input id="operationInput${index}" data-operation-input="${index}" inputmode="decimal" autocomplete="off" placeholder="Resultado" value="${esc(answer)}" aria-label="Resultado de ${esc(piece.expression)}" ${locked ? 'disabled' : ''} />
+          <button type="button" class="secondary" data-check-operation="${index}" ${locked ? 'disabled' : ''}>${accepted ? 'Aceito' : resultOk ? 'Encerrado' : 'Conferir'}</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    el.operationInputs.querySelectorAll('[data-check-operation]').forEach(button => {
+      button.addEventListener('click', () => checkOperation(Number(button.dataset.checkOperation)));
+    });
+    el.operationInputs.querySelectorAll('[data-operation-input]').forEach(input => {
+      input.addEventListener('input', () => input.setAttribute('aria-invalid', 'false'));
+      input.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          checkOperation(Number(input.dataset.operationInput));
+        }
+      });
+    });
+    return { pieces, detailed, ready };
+  }
+
+  function checkOperation(index) {
+    const step = currentStep();
+    const piece = operationPiecesFor(step)[index];
+    const input = el.operationInputs.querySelector(`[data-operation-input="${index}"]`);
+    if (!step || !piece || !input) return;
+    const key = operationKey(step, index);
+    state.operationAnswers[key] = input.value;
+    state.operationCorrect[key] = numericClose(parseNum(input.value), piece.expected);
+    if (!state.operationCorrect[key]) {
+      input.setAttribute('aria-invalid', 'true');
+      el.feedback.className = 'feedback bad';
+      el.feedback.textContent = 'Esta operação ainda não foi aceita. Confira os valores destacados no diagrama.';
+      return;
+    }
+    renderStep();
+  }
+
+  function toggleOperationMode() {
+    const step = currentStep();
+    if (!step || !operationPiecesFor(step).length) return;
+    const key = stepKey(step);
+    state.operationModes[key] = !state.operationModes[key];
+    renderStep();
+  }
+
+  function flowPhaseFor(type) {
+    if (['z1', 'o1', 'z2', 'o2'].includes(type)) return 'forward';
+    if (['e2', 'd2', 'r1', 'd1'].includes(type)) return 'backprop';
+    if (['nw2', 'nw1'].includes(type)) return 'weights';
+    return '';
+  }
+
+  function renderFlow(step) {
+    const active = step ? flowPhaseFor(step.type) : '';
+    const order = ['forward', 'backprop', 'weights'];
+    const activeIndex = order.indexOf(active);
+    document.querySelectorAll('[data-flow-phase]').forEach(node => {
+      const index = order.indexOf(node.dataset.flowPhase);
+      node.classList.toggle('is-active', node.dataset.flowPhase === active);
+      node.classList.toggle('is-done', activeIndex > index);
+    });
+  }
+
   function renderStep() {
     const step = currentStep();
     if (!step) {
@@ -667,7 +834,6 @@
       el.stepContext.innerHTML = 'Revise os dados na <strong>Preparação</strong> e selecione <strong>Começar prática</strong>.';
       el.formulaStatic.textContent = '—';
       el.formulaValues.textContent = '—';
-      el.formulaLegend.innerHTML = '';
       el.codeSnippet.textContent = '—';
       el.progressBadge.textContent = '0 / 0';
       el.progressBar.style.width = '0%';
@@ -689,6 +855,8 @@
       el.feedback.textContent = '';
       el.answerSuccess.hidden = true;
       el.useCalculatorResultBtn.disabled = true;
+      renderOperationInputs(null);
+      renderFlow(null);
       return;
     }
 
@@ -701,17 +869,19 @@
     el.stepContext.innerHTML = spec.context;
     el.formulaStatic.textContent = spec.formula;
     el.formulaValues.textContent = spec.substitution;
-    el.formulaLegend.innerHTML = spec.vars.map(v => `<div><strong>${esc(v.symbol)}</strong> = ${esc(Number.isFinite(v.value) ? fmt(v.value, 8) : '?')}</div><div class="formula-source">${esc(v.desc)}</div>`).join('');
     el.codeSnippet.textContent = spec.code;
-    el.resultPrompt.textContent = `Calcule ${spec.resultSymbol}; este é o valor que o neurônio deve responder nesta etapa.`;
+    const operationState = renderOperationInputs(step, resultOk);
+    el.resultPrompt.textContent = operationState.detailed && !operationState.ready
+      ? 'Conclua as operações acima antes de registrar o resultado final.'
+      : `Calcule ${spec.resultSymbol}; este é o resultado desta etapa.`;
     el.answerLabel.textContent = `Digite aqui o valor de ${spec.resultSymbol}`;
     el.answerInput.placeholder = `Resultado de ${spec.resultSymbol}`;
     el.answerInput.setAttribute('aria-label', `Resposta para ${spec.resultSymbol}`);
     el.answerInput.setAttribute('aria-invalid', 'false');
     el.resultBlock.classList.remove('locked');
     el.resultBlock.classList.toggle('is-correct', resultOk);
-    el.answerInput.disabled = resultOk;
-    el.checkBtn.disabled = resultOk;
+    el.answerInput.disabled = resultOk || !operationState.ready;
+    el.checkBtn.disabled = resultOk || !operationState.ready;
     el.hintBtn.disabled = resultOk;
     el.revealBtn.disabled = resultOk;
     el.answerInput.value = state.resultAnswers[key] ?? '';
@@ -732,6 +902,7 @@
     el.progressBadge.textContent = `${Math.min(done, state.steps.length)} / ${state.steps.length}`;
     el.progressBar.style.width = `${pct}%`;
     el.phaseLabel.textContent = done === state.steps.length ? 'Prática concluída' : phaseName(step.type);
+    renderFlow(step);
   }
 
   function numericClose(user, expected) {
@@ -1278,6 +1449,7 @@
   el.checkBtn.addEventListener('click', checkResult);
   el.answerInput.addEventListener('keydown', e => { if (e.key === 'Enter') checkResult(); });
   el.answerInput.addEventListener('input', () => el.answerInput.setAttribute('aria-invalid', 'false'));
+  el.operationModeBtn.addEventListener('click', toggleOperationMode);
   el.calculatorEvaluate.addEventListener('click', evaluateCalculator);
   el.calculatorInput.addEventListener('input', resetCalculatorResult);
   el.calculatorInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); evaluateCalculator(); } });

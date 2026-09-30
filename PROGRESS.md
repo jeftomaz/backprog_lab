@@ -2,6 +2,7 @@
 
 ## 2026-09-30
 
+- Painel direito reorganizado: fluxo compacto de Forward, Backprop e pesos; operações da etapa ficam separadas e os valores conhecidos permanecem no diagrama. Multiplicações, retornos, derivadas e correções podem ser conferidos por partes antes do resultado final.
 - Interface ampliada: tipografia, fórmulas, entradas, botões, alvos de toque, calculadora, diagrama e ajuda ganharam escala legível e mantêm layout responsivo.
 - Área de resposta agora identifica o valor do neurônio pedido, mantém a confirmação verde de acerto e permite preencher o campo a partir da calculadora científica segura.
 - Diagrama passou a editar entradas, alvos e pesos pelo inspetor; durante a prática, a confirmação antecede o reinício dos cálculos.

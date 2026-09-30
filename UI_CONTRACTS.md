@@ -7,7 +7,9 @@
 | Preparação | Único local editável; arquitetura fica aberta e atualiza entradas, alvos e matrizes de pesos. |
 | Guia rápido | Explica `x`, `h`, `y`, `t`, pesos e bias; cada saída `yₖ` tem um alvo `tₖ`, mas previsão e alvo são valores distintos. |
 | Pesos manuais | Limpa as matrizes e exige todos os valores antes de iniciar; bloqueia pesos inteiramente zerados e neurônios ocultos com pesos idênticos. |
-| Prática | Exibe uma etapa por vez; identifica explicitamente o símbolo a responder e mantém apenas a ação útil para o estado atual habilitada. |
+| Prática | Fluxo compacto mostra Forward, Backprop e pesos; abaixo dele, uma etapa por vez identifica o símbolo a responder e mantém apenas a ação útil habilitada. |
+| Cálculo por partes | Em fórmulas com operações intermediárias, permite optar por conferir cada termo; o resultado final só é liberado após todos os termos aceitos. |
+| Valores da etapa | O diagrama destacado é a referência dos valores conhecidos; a substituição numérica fica recolhida para evitar repetição. |
 | Resposta aceita | Mantém confirmação verde com o valor registrado e libera a próxima etapa. |
 | Calculadora científica | Aceita funções e operadores pré-definidos localmente; pode transferir resultado finito para a resposta, sem avaliar código. |
 | Diagrama e inspetor | Entradas, alvos e conexões aceitam clique, `Enter` e espaço; o inspetor permite editar o valor validado. |
